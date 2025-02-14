@@ -1,4 +1,4 @@
-name: release-to-maven-central
+name: Release To Maven Central
 
 on:
   workflow_dispatch:
@@ -12,6 +12,9 @@ on:
         required: true
         type: boolean
         default: false
+
+env:
+  VERSION: ${{ github.event.inputs.releaseversion }}
 
 jobs:
   publish-central-and-pages:
@@ -36,12 +39,16 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          server-id: oss.sonatype.org
+          server-id: central
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
           cache: 'maven'
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSS_SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
       - name: Cache node modules
         uses: actions/cache@v4
@@ -65,23 +72,31 @@ jobs:
           MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
 
-      - name: Deploy Asciidoc docs output to GitHub Pages
+      - name: Deploy documentation to GitHub Pages for version ${{ github.event.inputs.releaseversion }}
         uses: JamesIves/github-pages-deploy-action@v4.7.2
         with:
-          branch: gh-pages # The branch the action should deploy to.
-          folder: spring-boot-admin-docs/target/generated-docs # The folder the action should deploy.
+          branch: gh-pages
+          folder: spring-boot-admin-docs/target/generated-docs
           target-folder: ${{ github.event.inputs.releaseversion }}
-          clean: true # Automatically remove deleted files from the deploy branch
+          clean: true
 
-      - name: Deploy Asciidoc docs output to GitHub Pages
+      - name: Deploy redirect for /current to /${{ github.event.inputs.releaseversion }}
         uses: JamesIves/github-pages-deploy-action@v4.7.2
         if: github.event.inputs.copyDocsToCurrent == 'true'
         with:
-          branch: gh-pages # The branch the action should deploy to.
-          folder: spring-boot-admin-docs/target/generated-docs # The folder the action should deploy.
+          branch: gh-pages
+          folder: spring-boot-admin-docs/target/generated-docs/current
           target-folder: /current
-          clean: true # Automatically remove deleted files from the deploy branch
+          clean: true
 
+      - name: Deploy deeplink redirect for /current/* to /${{ github.event.inputs.releaseversion }}/*
+        uses: JamesIves/github-pages-deploy-action@v4.7.2
+        if: github.event.inputs.copyDocsToCurrent == 'true'
+        with:
+          branch: gh-pages
+          folder: spring-boot-admin-docs/target/generated-docs/current
+          target-folder: /
+          clean: false
 
   publish-github-release:
     needs: publish-central-and-pages
